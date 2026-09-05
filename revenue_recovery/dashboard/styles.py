@@ -11,6 +11,7 @@ COLORS = {
     "card_bg": "#151E32",
     "border": "#28324A",
     "text_dim": "#93A0B8",
+    "bg": "#0B1120",
 }
 
 STATUS_COLOR = {
@@ -76,61 +77,233 @@ def format_inr(amount: float) -> str:
     return f"{sign}₹{grouped}"
 
 
+PIPELINE_STAGES = [
+    ("detect", "🔎", "Detect", "Risk + recoverable ₹"),
+    ("diagnose", "🩺", "Diagnose", "Root cause: rules + LLM"),
+    ("decide", "🧭", "Decide", "Deterministic policy table"),
+    ("guardrail", "🛡️", "Guard", "Non-overridable stop rules"),
+    ("act", "⚡", "Act", "Simulated recovery workflow"),
+    ("measure", "📊", "Measure", "Recovered ₹ + audit trail"),
+]
+
+
+def pipeline_stepper() -> str:
+    """Header visual: the six-stage loop, one node per audit stage."""
+    nodes: list[str] = []
+    for i, (_key, icon, label, sub) in enumerate(PIPELINE_STAGES):
+        nodes.append(
+            '<div class="pl-node">'
+            f'<div class="pl-icon-wrap">{icon}</div>'
+            f'<div class="pl-label">{label}</div>'
+            f'<div class="pl-sub">{sub}</div>'
+            "</div>"
+        )
+        if i < len(PIPELINE_STAGES) - 1:
+            nodes.append('<div class="pl-arrow">&rarr;</div>')
+    return f'<div class="pipeline-row">{"".join(nodes)}</div>'
+
+
 def inject_css() -> str:
     return f"""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    html, body, [class^="css"], .stApp, .stMarkdown, p, span, div {{
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }}
+
+    .stApp {{
+        background:
+            radial-gradient(720px 320px at 18% 0%, rgba(99,102,241,0.09), transparent 70%),
+            {COLORS['bg']};
+    }}
+
     .block-container {{
         padding-top: 1.6rem;
-        padding-bottom: 2rem;
-        max-width: 1200px;
+        padding-bottom: 2.5rem;
+        max-width: 1220px;
     }}
     #MainMenu, footer, header {{ visibility: hidden; }}
 
+    .kicker {{
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: rgba(99,102,241,0.14);
+        border: 1px solid rgba(99,102,241,0.35);
+        color: #A5B4FC;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 0.3rem 0.75rem;
+        border-radius: 999px;
+        margin-bottom: 0.7rem;
+    }}
+    .kicker .dot {{
+        width: 6px; height: 6px; border-radius: 50%;
+        background: {COLORS['recovered']};
+        box-shadow: 0 0 0 3px rgba(34,197,94,0.25);
+    }}
+
     .app-title {{
-        font-size: 1.9rem;
-        font-weight: 800;
-        margin-bottom: 0.1rem;
-        letter-spacing: -0.02em;
+        font-size: 2.4rem;
+        font-weight: 900;
+        margin-bottom: 0.15rem;
+        letter-spacing: -0.03em;
+        background: linear-gradient(100deg, #F8FAFC 25%, #A5B4FC 55%, #7DD3FC 85%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
     }}
     .app-subtitle {{
         color: {COLORS['text_dim']};
-        font-size: 0.95rem;
-        margin-bottom: 1.4rem;
+        font-size: 1rem;
+        margin-bottom: 1.6rem;
+        max-width: 780px;
+        line-height: 1.5;
     }}
     .section-title {{
         font-size: 1.15rem;
         font-weight: 700;
-        margin: 1.4rem 0 0.6rem 0;
+        margin: 1.6rem 0 0.7rem 0;
         letter-spacing: -0.01em;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
     }}
+    .section-title::before {{
+        content: "";
+        width: 3px;
+        height: 1.1rem;
+        border-radius: 3px;
+        background: linear-gradient(180deg, {COLORS['neutral']}, {COLORS['recovered']});
+        display: inline-block;
+    }}
+
+    /* Pipeline stepper */
+    .pipeline-row {{
+        display: flex;
+        align-items: stretch;
+        gap: 0.4rem;
+        margin-bottom: 1.8rem;
+        flex-wrap: wrap;
+    }}
+    .pl-node {{
+        flex: 1 1 130px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+        border: 1px solid {COLORS['border']};
+        border-radius: 12px;
+        padding: 0.8rem 0.7rem;
+        text-align: center;
+        transition: transform 0.15s ease, border-color 0.15s ease;
+    }}
+    .pl-node:hover {{
+        transform: translateY(-3px);
+        border-color: {COLORS['neutral']};
+    }}
+    .pl-icon-wrap {{
+        width: 34px; height: 34px;
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto 0.4rem auto;
+        background: rgba(99,102,241,0.15);
+        font-size: 1.05rem;
+    }}
+    .pl-label {{
+        font-weight: 700;
+        font-size: 0.82rem;
+        letter-spacing: 0.01em;
+        margin-bottom: 0.15rem;
+    }}
+    .pl-sub {{
+        font-size: 0.68rem;
+        color: {COLORS['text_dim']};
+        line-height: 1.25;
+    }}
+    .pl-arrow {{
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: {COLORS['border']};
+        font-size: 1.2rem;
+        flex: 0 0 auto;
+        padding: 0 0.1rem;
+    }}
+    @media (max-width: 900px) {{ .pl-arrow {{ display: none; }} }}
 
     /* KPI cards */
     .kpi-card {{
-        background: {COLORS['card_bg']};
+        position: relative;
+        background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.005)), {COLORS['card_bg']};
         border: 1px solid {COLORS['border']};
-        border-left: 4px solid var(--accent, {COLORS['neutral']});
-        border-radius: 10px;
-        padding: 0.95rem 1.1rem;
+        border-radius: 14px;
+        padding: 1.05rem 1.2rem 1.1rem 1.2rem;
         height: 100%;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        overflow: hidden;
+    }}
+    .kpi-card::before {{
+        content: "";
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 3px;
+        background: var(--accent, {COLORS['neutral']});
+    }}
+    .kpi-card:hover {{
+        transform: translateY(-3px);
+        box-shadow: 0 14px 32px rgba(0,0,0,0.28);
+        border-color: var(--accent, {COLORS['neutral']});
     }}
     .kpi-label {{
         font-size: 0.72rem;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.07em;
         color: {COLORS['text_dim']};
-        margin-bottom: 0.35rem;
-        font-weight: 600;
+        margin-bottom: 0.5rem;
+        font-weight: 700;
     }}
     .kpi-value {{
-        font-size: 1.7rem;
+        font-size: 1.85rem;
         font-weight: 800;
         line-height: 1.1;
+        display: flex;
+        align-items: center;
+        letter-spacing: -0.01em;
     }}
-    .kpi-icon {{ font-size: 1.1rem; margin-right: 0.35rem; }}
+    .kpi-icon {{
+        font-size: 1.05rem;
+        margin-right: 0.5rem;
+        width: 30px; height: 30px;
+        border-radius: 9px;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: color-mix(in srgb, var(--accent, {COLORS['neutral']}) 20%, transparent);
+        flex: 0 0 auto;
+    }}
     .kpi-sub {{
         font-size: 0.78rem;
         color: {COLORS['text_dim']};
-        margin-top: 0.25rem;
+        margin-top: 0.4rem;
+    }}
+
+    /* Tabs */
+    button[data-baseweb="tab"] {{
+        font-weight: 600;
+        font-size: 0.95rem;
+        padding: 0.6rem 1.1rem !important;
+    }}
+    div[data-baseweb="tab-highlight"] {{
+        background: linear-gradient(90deg, {COLORS['neutral']}, {COLORS['recovered']}) !important;
+        height: 3px !important;
+    }}
+    div[data-baseweb="tab-border"] {{ background: {COLORS['border']} !important; }}
+
+    /* Dataframe / expander polish */
+    div[data-testid="stDataFrame"] {{
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid {COLORS['border']};
     }}
 
     /* Badges */

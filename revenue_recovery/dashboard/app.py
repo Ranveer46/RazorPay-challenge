@@ -22,7 +22,7 @@ from core.detector import score_event
 from core.models import RevenueEvent
 from dashboard.styles import (
     CATEGORY_COLOR, CATEGORY_LABEL, COLORS, STAGE_ICON, STATUS_COLOR,
-    STATUS_LABEL, format_inr, inject_css,
+    STATUS_LABEL, format_inr, inject_css, pipeline_stepper,
 )
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -88,12 +88,19 @@ scorecard = load_scorecard()
 
 # ---------------------------------------------------------------- header ---
 
-st.markdown('<div class="app-title">💸 AI Revenue Recovery Agent</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="app-subtitle">Detect &rarr; Diagnose &rarr; Decide &rarr; Act &rarr; Log &rarr; '
-    'Measure — live batch results on synthetic revenue-at-risk events</div>',
+    '<div class="kicker"><span class="dot"></span>Hackathon Prototype &middot; Live Batch Run</div>',
     unsafe_allow_html=True,
 )
+st.markdown('<div class="app-title">💸 AI Revenue Recovery Agent</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="app-subtitle">A bounded, rule-driven agent that detects revenue at risk, diagnoses '
+    'the root cause, and executes a guardrailed recovery workflow — across payment failures, checkout '
+    'abandonment, subscription dunning, and overdue B2B receivables. Deterministic policy decides '
+    '<i>what</i> to do; the LLM only ever writes the message.</div>',
+    unsafe_allow_html=True,
+)
+st.markdown(pipeline_stepper(), unsafe_allow_html=True)
 
 tab_overview, tab_queue, tab_audit = st.tabs(["📊 Overview", "🎯 Risk Queue", "🧾 Audit Drill-Down"])
 
