@@ -244,17 +244,24 @@ Total Runtime:              4.12 seconds
 
 ## 🔌 API Reference
 
-The FastAPI service exposes 6 high-throughput endpoints for integration into core payment rails:
+The FastAPI service exposes 7 high-throughput endpoints for integration into core payment rails:
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/` | Service health status, system metadata, and event count |
+| `GET` | `/` | Service health status, system metadata, live gateway status, and event count |
 | `GET` | `/risk/queue?limit=50` | Prioritized queue of revenue-at-risk events sorted by urgency |
-| `POST` | `/events/ingest` | Real-time webhook ingestion for payment decline/abandonment events |
+| `POST` | `/events/ingest` | Real-time event ingestion for payment decline/abandonment events |
 | `POST` | `/recover/{event_id}/execute` | Triggers the 6-stage autonomous recovery loop for a specific event |
 | `GET` | `/audit/{event_id}` | Complete immutable step-by-step audit trail for compliance |
 | `POST` | `/batch/run` | Triggers a full asynchronous batch recovery simulation |
 | `GET` | `/metrics/batch/{batch_id}` | Retrieves aggregate recovery metrics and guardrail statistics |
+| `POST` | `/webhook/razorpay` | Ingests live Razorpay Webhooks (`payment.failed`, `invoice.payment_failed`) with HMAC verification |
+
+### Razorpay Gateway Integration (Sandbox / Test Mode)
+
+The agent supports official Razorpay Python SDK integration via a **dual-mode adapter**:
+- **Live Sandbox Mode**: When `RAZORPAY_KEY_ID` & `RAZORPAY_KEY_SECRET` are configured in `.env`, the agent creates real Razorpay Payment Links (`https://rzp.io/i/...`) and Invoices, embedding them directly into customer outreach copy.
+- **Offline Fallback Mode**: If keys are absent, the agent seamlessly operates in 100% offline simulated mode with realistic demo links (`https://rzp.io/l/...`).
 
 ### Example Request: Recover Single Event
 

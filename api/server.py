@@ -5,27 +5,34 @@ Run: uvicorn api.server:app --reload --port 8000
 from __future__ import annotations
 
 import json
+import logging
 import sys
 import uuid
+from datetime import datetime
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel
 
 from core.audit import AuditLog  # noqa: E402
 from core.detector import score_event  # noqa: E402
 from core.diagnoser import diagnose  # noqa: E402
 from core.guardrails import DiscountBudget, GuardrailContext  # noqa: E402
-from core.models import BatchScorecard, Decision, Detection, RevenueEvent  # noqa: E402
+from core.models import (  # noqa: E402
+    BatchScorecard, Category, Decision, Detection, RevenueEvent, Segment,
+)
 from core.orchestrator import process_event, run_batch  # noqa: E402
 from core.policy import decide_intervention  # noqa: E402
+from core.razorpay_gateway import gateway  # noqa: E402
+
+logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
-app = FastAPI(title="AI Revenue Recovery Agent", version="0.1.0")
+app = FastAPI(title="Razorpay AI Revenue Recovery Agent", version="0.2.0")
 
 _store: dict[str, RevenueEvent] = {}
 _audit = AuditLog(db_path=DATA_DIR / "audit_api.db")
@@ -136,13 +143,92 @@ def batch_metrics(batch_id: str):
     }
 
 
+@app.post("/webhook/razorpay")
+async def razorpay_webhook(
+    request: Request,
+    x_razorpay_signature: Optional[str] = Header(None),
+):
+    """Receives live Razorpay webhooks (e.g. payment.failed, invoice.payment_failed)
+    and automatically ingests and processes them through the autonomous recovery loop.
+    """
+    raw_body = await request.body()
+
+    if gateway.webhook_secret and x_razorpay_signature:
+        is_valid = gateway.verify_webhook_signature(raw_body, x_razorpay_signature)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail="Invalid Razorpay webhook signature")
+
+    try:
+        data = json.loads(raw_body.decode("utf-8"))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Malformed JSON payload")
+
+    event_type = data.get("event", "unknown")
+    entity_payload = data.get("payload", {})
+
+    created_event: Optional[RevenueEvent] = None
+    event_id = f"RZP-{uuid.uuid4().hex[:8]}"
+
+    if event_type == "payment.failed":
+        payment_entity = entity_payload.get("payment", {}).get("entity", {})
+        amount = float(payment_entity.get("amount", 0)) / 100.0  # paise to INR
+        created_event = RevenueEvent(
+            event_id=event_id,
+            category=Category.PAYMENT_FAILURE,
+            account_id=payment_entity.get("customer_id") or "acc_guest",
+            customer_name=payment_entity.get("email", "Customer").split("@")[0].title() or "Razorpay Customer",
+            segment=Segment.CONSUMER,
+            payment_reliability_score=0.7,
+            amount_at_risk=amount or 1500.0,
+            decline_code=payment_entity.get("error_code") or "BAD_REQUEST_ERROR",
+            gateway="razorpay",
+            created_at=datetime.utcnow(),
+        )
+
+    elif event_type in ("invoice.payment_failed", "invoice.expired"):
+        inv_entity = entity_payload.get("invoice", {}).get("entity", {})
+        amount = float(inv_entity.get("amount", 0)) / 100.0
+        created_event = RevenueEvent(
+            event_id=event_id,
+            category=Category.RECEIVABLE_OVERDUE,
+            account_id=inv_entity.get("customer_id") or "acc_b2b",
+            customer_name=inv_entity.get("customer_name") or "Enterprise Client",
+            segment=Segment.SMB,
+            payment_reliability_score=0.85,
+            amount_at_risk=amount or 25000.0,
+            invoice_id=inv_entity.get("id"),
+            days_overdue=15,
+            created_at=datetime.utcnow(),
+        )
+
+    if created_event:
+        _store[created_event.event_id] = created_event
+        outcome = process_event(created_event, _audit, _guardrail_ctx)
+        return {
+            "status": "ingested_and_processed",
+            "event_type": event_type,
+            "event_id": created_event.event_id,
+            "recovery_outcome": outcome.final_status,
+            "amount_recovered": outcome.amount_recovered,
+        }
+
+    return {"status": "ignored", "event_type": event_type}
+
+
 @app.get("/")
 def root():
     return {
-        "service": "AI Revenue Recovery Agent",
+        "service": "Razorpay AI Revenue Recovery Agent",
+        "version": "0.2.0",
         "events_loaded": len(_store),
+        "gateway_live_mode": gateway.is_configured(),
         "endpoints": [
-            "POST /events/ingest", "GET /risk/queue", "POST /recover/{event_id}/execute",
-            "GET /audit/{event_id}", "POST /batch/run", "GET /metrics/batch/{batch_id}",
+            "POST /events/ingest",
+            "GET /risk/queue",
+            "POST /recover/{event_id}/execute",
+            "GET /audit/{event_id}",
+            "POST /batch/run",
+            "GET /metrics/batch/{batch_id}",
+            "POST /webhook/razorpay",
         ],
     }
