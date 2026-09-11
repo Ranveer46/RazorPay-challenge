@@ -161,17 +161,23 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment (Optional LLM Keys)
+### 2. Configure Environment (Optional LLM & Gateway Keys)
 
 ```bash
 cp .env.example .env
 ```
-Edit `.env` to supply API keys if you want live generative message composition:
+Edit `.env` to supply API keys:
 ```ini
-# Optional: The pipeline runs 100% offline with templates if left blank
+# Optional LLM Keys (Falls back to deterministic offline templates if unset):
 GEMINI_API_KEY=your_gemini_api_key_here
 # or
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+# Optional Razorpay Gateway Keys (Enables live sandbox Payment Links, Invoices, & Webhooks):
+# If left blank, the agent runs in 100% offline simulated mode.
+RAZORPAY_KEY_ID=rzp_test_your_key_id
+RAZORPAY_KEY_SECRET=your_key_secret
+RAZORPAY_WEBHOOK_SECRET=your_webhook_secret
 ```
 
 ### 3. Run the End-to-End Batch Pipeline
@@ -353,7 +359,8 @@ Production financial infrastructure requires **99.999% uptime**. The agent was i
 │   ├── llm_client.py          # Resilient multi-provider client (Gemini, Claude, offline)
 │   ├── models.py              # Pydantic schemas shared across the pipeline
 │   ├── orchestrator.py        # 6-stage lifecycle driver (single event & batch)
-│   └── policy.py              # Deterministic decision table
+│   ├── policy.py              # Deterministic decision table
+│   └── razorpay_gateway.py    # Official Razorpay SDK adapter (Payment Links, Invoices, Webhooks)
 ├── dashboard/
 │   ├── app.py                 # Interactive Streamlit operations console
 │   └── styles.py              # FinTech design system & injected CSS
@@ -361,7 +368,7 @@ Production financial infrastructure requires **99.999% uptime**. The agent was i
 │   ├── generate_dataset.py    # Synthetic dataset generator with realistic ground truth
 │   ├── events.json            # Generated benchmark dataset
 │   └── scorecard.json         # Latest batch execution scorecard
-└── tests/                     # Comprehensive test suite
+└── tests/                     # Comprehensive test suite (47 automated tests)
 ```
 
 ---
